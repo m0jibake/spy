@@ -11,10 +11,14 @@ var (
 	reTimestamp = regexp.MustCompile(`\d+:\d+:\d+\.\d+\s*-->\s*\d+:\d+:\d+\.\d+`)
 )
 
+func buildWhisperArgs(modelPath, audioFile, language string) []string {
+	return []string{"-m", modelPath, "-f", audioFile, "-l", language}
+}
+
 // Transcribe runs whisper-cli on audioFile using modelPath and returns
-// the cleaned transcript text.
-func Transcribe(modelPath, audioFile string) (string, error) {
-	out, err := exec.Command("whisper-cli", "-m", modelPath, "-f", audioFile).Output()
+// the cleaned transcript text. language is a BCP-47 tag (e.g. "en", "de").
+func Transcribe(modelPath, audioFile, language string) (string, error) {
+	out, err := exec.Command("whisper-cli", buildWhisperArgs(modelPath, audioFile, language)...).Output()
 	if err != nil {
 		return "", err
 	}
