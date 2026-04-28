@@ -14,6 +14,7 @@ func TestBuildWhisperArgs(t *testing.T) {
 	}{
 		{"/models/ggml-small.bin", "/tmp/spy.wav", "en", []string{"-m", "/models/ggml-small.bin", "-f", "/tmp/spy.wav", "-l", "en"}},
 		{"/models/ggml-small.bin", "/tmp/spy.wav", "de", []string{"-m", "/models/ggml-small.bin", "-f", "/tmp/spy.wav", "-l", "de"}},
+		{"/models/ggml-small.bin", "/tmp/spy.wav", "fr", []string{"-m", "/models/ggml-small.bin", "-f", "/tmp/spy.wav", "-l", "fr"}},
 	}
 	for _, tt := range tests {
 		got := buildWhisperArgs(tt.modelPath, tt.audioFile, tt.language)

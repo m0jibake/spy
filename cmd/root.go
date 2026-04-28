@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	hook "github.com/robotn/gohook"
@@ -27,8 +28,10 @@ var rootCmd = &cobra.Command{
 	Short: "Hold ⌥ Option to record speech; release to transcribe and copy to clipboard.",
 	Long: `spy — speech-to-clipboard via local whisper model.
 
-Hold the Option (⌥) key to start recording. Release to stop,
+Hold the Option (⌥) key to start recording in English. Release to stop,
 transcribe, and copy the result to your clipboard.
+
+For German: hold ⌥⇧ (Option+Shift) — release to transcribe as German.
 
 Requires: sox, whisper-cli (whisper.cpp).
 macOS only.`,
@@ -88,16 +91,25 @@ func runListener(cmd *cobra.Command, args []string) error {
 	audioFile := viper.GetString("audio_file")
 
 	fmt.Println("🕵️  spy is watching.")
-	fmt.Println("   Hold ⌥ Option to record. Release to transcribe & copy.")
-	fmt.Println("   Press Ctrl+C to quit.\n")
+	fmt.Println("   Hold ⌥ to record in English. Release to transcribe & copy.")
+	fmt.Println("   Hold ⌥⇧ to record in German. Release to transcribe & copy.")
+	fmt.Println("   Press Ctrl+C to quit.")
+	fmt.Println()
+
+	if strings.Contains(model, ".en.") {
+		fmt.Println("⚠️  Model appears to be English-only. German transcription requires a multilingual model (e.g. ggml-small.bin).")
+		fmt.Println()
+	}
 
 	rec := recorder.New(audioFile)
 	recording := false
+	recordingLang := ""
 
 	hook.Register(hook.KeyDown, []string{"alt"}, func(e hook.Event) {
 		if !recording {
 			recording = true
-			fmt.Print("🎙️  Recording... (release ⌥ to stop)")
+			recordingLang = "en"
+			fmt.Print("🎙️  Recording [EN]... (release ⌥ to stop)")
 			if err := rec.Start(); err != nil {
 				fmt.Printf("\n❌ Failed to start recording: %v\n", err)
 				recording = false
@@ -105,15 +117,35 @@ func runListener(cmd *cobra.Command, args []string) error {
 		}
 	})
 
-	hook.Register(hook.KeyUp, []string{"alt"}, func(e hook.Event) {
-		if recording {
+	// alt+shift fires after alt alone when both are held — upgrade language to German.
+	hook.Register(hook.KeyDown, []string{"alt", "shift"}, func(e hook.Event) {
+		if recording && recordingLang == "en" {
+			recordingLang = "de"
+			fmt.Print("\r🎙️  Recording [DE]... (release ⌥⇧ to stop)   ")
+		}
+	})
+
+	hook.Register(hook.KeyUp, []string{"alt", "shift"}, func(e hook.Event) {
+		if recording && recordingLang == "de" {
 			recording = false
 			fmt.Println()
 			if err := rec.Stop(); err != nil {
 				fmt.Printf("❌ Failed to stop recording: %v\n", err)
 				return
 			}
-			go processAudio(model, audioFile)
+			go processAudio(model, audioFile, "de")
+		}
+	})
+
+	hook.Register(hook.KeyUp, []string{"alt"}, func(e hook.Event) {
+		if recording && recordingLang == "en" {
+			recording = false
+			fmt.Println()
+			if err := rec.Stop(); err != nil {
+				fmt.Printf("❌ Failed to stop recording: %v\n", err)
+				return
+			}
+			go processAudio(model, audioFile, "en")
 		}
 	})
 
@@ -135,10 +167,10 @@ func runListener(cmd *cobra.Command, args []string) error {
 }
 
 // processAudio transcribes and copies to clipboard.
-func processAudio(model, audioFile string) {
+func processAudio(model, audioFile, language string) {
 	fmt.Print("⏳ Processing... ")
 
-	text, err := transcriber.Transcribe(model, audioFile)
+	text, err := transcriber.Transcribe(model, audioFile, language)
 	if err != nil {
 		fmt.Printf("\n❌ Transcription error: %v\n", err)
 		return

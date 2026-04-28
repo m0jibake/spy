@@ -11,6 +11,7 @@ var (
 	reTimestamp = regexp.MustCompile(`\d+:\d+:\d+\.\d+\s*-->\s*\d+:\d+:\d+\.\d+`)
 )
 
+// buildWhisperArgs returns the whisper-cli argument slice for the given model, audio file, and BCP-47 language tag.
 func buildWhisperArgs(modelPath, audioFile, language string) []string {
 	return []string{"-m", modelPath, "-f", audioFile, "-l", language}
 }
